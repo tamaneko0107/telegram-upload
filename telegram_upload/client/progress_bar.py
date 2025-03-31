@@ -4,6 +4,8 @@ import click
 
 
 def get_progress_bar(action, file, length):
+    if len(file) > 20:
+        file = file[:10] + '...' + file[-7:]
     bar = click.progressbar(label='{} "{}"'.format(action, file), length=length)
     last_current = c_int64(0)
 
