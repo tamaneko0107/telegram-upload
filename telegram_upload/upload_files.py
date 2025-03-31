@@ -77,13 +77,14 @@ def get_file_thumb(file):
 
 class UploadFilesBase:
     def __init__(self, client: 'TelegramManagerClient', files, thumbnail: Union[str, bool, None] = None,
-                 force_file: bool = False, caption: Union[str, None] = None):
+                 force_file: bool = False, caption: Union[str, None] = None, album: bool = False):
         self._iterator = None
         self.client = client
         self.files = files
         self.thumbnail = thumbnail
         self.force_file = force_file
         self.caption = caption
+        self.album = album
 
     def get_iterator(self):
         raise NotImplementedError
@@ -120,7 +121,13 @@ class NoDirectoriesFiles(UploadFilesBase):
 
 class LargeFilesBase(UploadFilesBase):
     def get_iterator(self):
-        for file in self.files:
+        caption_for_file = self.caption
+        for index, file in enumerate(self.files):
+            if self.album:
+                if index == len(self.files) - 1:
+                    self.caption = caption_for_file
+                else:
+                    self.caption = ''
             if os.path.getsize(file) > self.client.max_file_size:
                 yield from self.process_large_file(file)
             else:

@@ -175,7 +175,7 @@ def upload(files, to, config, delete_on_success, print_file_id, force_file, forw
     else:
         thumbnail = None
     files_cls = LARGE_FILE_MODES[large_files]
-    files = files_cls(client, files, caption=caption, thumbnail=thumbnail, force_file=force_file)
+    files = files_cls(client, files, caption=caption, thumbnail=thumbnail, force_file=force_file, album=album)
     if large_files == 'fail':
         # Validate now
         files = list(files)
