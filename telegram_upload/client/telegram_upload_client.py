@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import os
 import time
-import re
 from typing import Iterable, Optional
 
 import click
@@ -108,12 +107,6 @@ class TelegramUploadClient(TelegramClient):
         except FloodWaitError as e:
             click.echo(f'{e}. Waiting for {e.seconds} seconds.', err=True)
             time.sleep(e.seconds)
-            message = self.send_one_file(entity, file, send_as_media, thumb, retries)
-        except FloodError as e:
-            match = re.search(r'FLOOD_PREMIUM_WAIT_(\d+)', str(e))
-            wait_time = int(match.group(1))  # 提取等待時間
-            click.echo(f'FloodError: {e}. Waiting for {wait_time} seconds.', err=True)
-            time.sleep(wait_time)  # 按照指定的秒數等待
             message = self.send_one_file(entity, file, send_as_media, thumb, retries)
         except RPCError as e:
             if retries > 0:
@@ -281,7 +274,6 @@ class TelegramUploadClient(TelegramClient):
                                     file_size, part_count, part_size)
 
             pos = 0
-            tasks = []
             for part_index in range(part_count):
                 # Read the file by in chunks of size part_size
                 part = await helpers._maybe_await(stream.read(part_size))
@@ -319,16 +311,14 @@ class TelegramUploadClient(TelegramClient):
                     request = functions.upload.SaveFilePartRequest(
                         file_id, part_index, part)
                 await self.upload_semaphore.acquire()
-                tasks.append(self.loop.create_task(
+                self.loop.create_task(
                     self._send_file_part(request, part_index, part_count, pos, file_size, progress_callback),
                     name=f"telegram-upload-file-{part_index}"
-                ))
-                await asyncio.sleep(0.3)
+                )
             # Wait for all tasks to finish
-            # await asyncio.wait([
-            #     task for task in asyncio.all_tasks() if task.get_name().startswith(f"telegram-upload-file-")
-            # ])
-            await asyncio.wait(tasks)
+            await asyncio.wait([
+                task for task in asyncio.all_tasks() if task.get_name().startswith(f"telegram-upload-file-")
+            ])
         if is_big:
             return types.InputFileBig(file_id, part_count, file_name)
         else:
@@ -364,11 +354,6 @@ class TelegramUploadClient(TelegramClient):
         except ConnectionError:
             # Retry to send the file part
             click.echo(f'Detected connection error. Retrying...', err=True)
-        except FloodError as e:
-            match = re.search(r'FLOOD_PREMIUM_WAIT_(\d+)', str(e))
-            wait_time = int(match.group(1))  # 提取等待時間
-            click.echo(f'FloodError: {e}. Waiting for {wait_time} seconds.', err=True)
-            await asyncio.sleep(wait_time)  # 按照指定的秒數等待
         else:
             self.upload_semaphore.release()
         if result is None and retry < MAX_RECONNECT_RETRIES:
